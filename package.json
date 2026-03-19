@@ -1,0 +1,28 @@
+{
+  "name": "do-it-fitness-backend",
+  "version": "1.0.0",
+  "description": "Backend para Do It Fitness Club - membresías y pagos",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "lint": "eslint src/**/*.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "googleapis": "^128.0.0",
+    "morgan": "^1.10.0",
+    "nodemailer": "^6.9.8",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
