@@ -1,13 +1,13 @@
 /**
  * PayPhone - Cajita de Pagos
- * Documentación: https://docs.payphone.app
+ * Documentación: https://docs.payphone.app/cajita-de-pagos-payphone
  */
 
 const PAYPHONE_TOKEN    = process.env.PAYPHONE_TOKEN;
 const PAYPHONE_STORE_ID = process.env.PAYPHONE_STORE_ID;
 const BASE_URL          = 'https://pay.payphonetodoesposible.com/api';
 
-// Precios en CENTAVOS (PayPhone trabaja en centavos)
+// Precios en CENTAVOS (PayPhone trabaja con valores * 100)
 const PLAN_PRICES = {
   mensual:    3500,  // $35.00
   trimestral: 9000,  // $90.00
@@ -16,8 +16,8 @@ const PLAN_PRICES = {
 };
 
 /**
- * Crea una transacción en PayPhone.
- * Devuelve el paymentId y la URL de la cajita de pagos.
+ * Crea una transacción en PayPhone (Cajita de Pagos).
+ * Endpoint: POST /api/button/Prepare
  */
 async function createTransaction({ nombre, email, celular, plan, clientTransactionId }) {
   const monto = PLAN_PRICES[plan.toLowerCase()];
@@ -28,18 +28,23 @@ async function createTransaction({ nombre, email, celular, plan, clientTransacti
     amountWithoutTax:    monto,
     amountWithTax:       0,
     tax:                 0,
+    service:             0,
+    tip:                 0,
     currency:            'USD',
-    clientTransactionId, // ID único nuestro — lo usamos para vincular con Supabase
+    clientTransactionId,
     storeId:             PAYPHONE_STORE_ID,
     reference:           `Membresía ${plan} - Do It Fitness Club`,
-    // URL a la que PayPhone redirige tras el pago (confirmación final vía query params)
-    responseUrl: `${process.env.FRONTEND_URL}/membresia/confirmacion`,
-    cancellationUrl: `${process.env.FRONTEND_URL}/membresia/cancelado`,
-    // Datos del cliente (opcionales pero útiles para el panel de PayPhone)
+    responseUrl:         `${process.env.FRONTEND_URL}/membresia/confirmacion`,
+    cancellationUrl:     `${process.env.FRONTEND_URL}/membresia/cancelado`,
     email,
-    phoneNumber: celular,
-    documentId:  '',
+    phoneNumber:         celular,
+    documentId:          '',
+    firstName:           nombre,
   };
+
+  console.log('📤 PayPhone request:', JSON.stringify(body, null, 2));
+  console.log('🔑 Token (primeros 20 chars):', PAYPHONE_TOKEN?.substring(0, 20));
+  console.log('🏪 Store ID:', PAYPHONE_STORE_ID);
 
   const res = await fetch(`${BASE_URL}/button/Prepare`, {
     method:  'POST',
@@ -50,42 +55,47 @@ async function createTransaction({ nombre, email, celular, plan, clientTransacti
     body: JSON.stringify(body),
   });
 
+  const responseText = await res.text();
+  console.log('📥 PayPhone response status:', res.status);
+  console.log('📥 PayPhone response body:', responseText);
+
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`PayPhone error: ${err}`);
+    throw new Error(`PayPhone error ${res.status}: ${responseText}`);
   }
 
-  const data = await res.json();
+  const data = JSON.parse(responseText);
 
   return {
     payPhoneTransactionId: data.transactionId,
-    // URL de la cajita de pagos que se carga en el iframe del frontend
     cajitaUrl: `https://pay.payphonetodoesposible.com/pay?transactionId=${data.transactionId}&clientTransactionId=${clientTransactionId}`,
   };
 }
 
 /**
- * Confirma una transacción luego de que el cliente paga.
- * PayPhone redirige al frontend con ?transactionId=...&clientTransactionId=...
- * El frontend llama a nuestro backend con esos datos para confirmar.
+ * Confirma una transacción luego del pago.
+ * Endpoint: POST /api/button/V2/Confirm
  */
 async function confirmTransaction({ transactionId, clientTransactionId }) {
-  const res = await fetch(
-    `${BASE_URL}/button/V2/Confirm?transactionId=${transactionId}&clientTransactionId=${clientTransactionId}`,
-    {
-      method:  'GET',
-      headers: {
-        'Authorization': `Bearer ${PAYPHONE_TOKEN}`,
-      },
-    }
-  );
+  const body = { transactionId, clientTransactionId };
+
+  const res = await fetch(`${BASE_URL}/button/V2/Confirm`, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${PAYPHONE_TOKEN}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await res.text();
+  console.log('📥 PayPhone confirm status:', res.status);
+  console.log('📥 PayPhone confirm body:', responseText);
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`PayPhone confirm error: ${err}`);
+    throw new Error(`PayPhone confirm error ${res.status}: ${responseText}`);
   }
 
-  const data = await res.json();
+  const data = JSON.parse(responseText);
 
   // statusCode 3 = aprobado
   return {
