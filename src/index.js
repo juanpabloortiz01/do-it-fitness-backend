@@ -11,20 +11,21 @@ const { generalLimiter } = require('./middlewares/rateLimiter');
 const app  = express();
 const PORT = process.env.PORT || 3000;
  
+// Necesario para que el rate limiter funcione detrás del proxy de Easypanel
+app.set('trust proxy', 1);
+ 
 // ── Middlewares globales ───────────────────────────────
 app.use(morgan('dev'));
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
- 
-// Rate limiting general a todas las rutas
 app.use(generalLimiter);
  
 // ── Rutas ─────────────────────────────────────────────
 app.use('/api/payment',    paymentRoutes);
 app.use('/api/membership', membershipRoutes);
  
-// Health check (sin rate limit)
+// Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
  
 // ── Error handler global ──────────────────────────────
