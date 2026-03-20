@@ -4,18 +4,26 @@ const { v4: uuidv4 }                     = require('uuid');
 
 /**
  * POST /api/payment/create
- * Recibe los datos del formulario, crea la transacción en PayPhone
- * y guarda el registro pendiente en Supabase.
+ * Acepta campos del frontend (fullName, phone, birthDate)
+ * y del backend (nombre, celular, fechaNacimiento)
  */
 async function createPayment(req, res, next) {
   try {
-    const { nombre, email, celular, fechaNacimiento, plan } = req.body;
+    // Normalizar campos — aceptar ambos formatos
+    const nombre          = req.body.nombre      || req.body.fullName;
+    const email           = req.body.email;
+    const celular         = req.body.celular      || req.body.phone;
+    const fechaNacimiento = req.body.fechaNacimiento || req.body.birthDate;
+    const plan            = req.body.plan;
+
+    if (!nombre || !email || !celular || !fechaNacimiento || !plan) {
+      return res.status(422).json({ error: 'Todos los campos son requeridos' });
+    }
 
     const planKey = plan.toLowerCase();
-    const valor   = PLAN_PRICES[planKey] / 100; // convertir centavos a dólares para guardar
+    const valor   = PLAN_PRICES[planKey] / 100;
     if (!valor) return res.status(400).json({ error: `Plan inválido: ${plan}` });
 
-    // ID único para vincular PayPhone con Supabase
     const clientTransactionId = uuidv4();
 
     // 1. Crear transacción en PayPhone
@@ -27,9 +35,9 @@ async function createPayment(req, res, next) {
       clientTransactionId,
     });
 
-    // 2. Guardar datos temporales en Supabase
+    // 2. Guardar en Supabase
     await savePendingPayment({
-      preferenceId: clientTransactionId, // reutilizamos el campo con nuestro ID único
+      preferenceId: clientTransactionId,
       nombre,
       email,
       celular,
@@ -38,7 +46,6 @@ async function createPayment(req, res, next) {
       valor,
     });
 
-    // 3. Devolver la URL de la cajita y los IDs al frontend
     return res.json({
       clientTransactionId,
       payPhoneTransactionId,
