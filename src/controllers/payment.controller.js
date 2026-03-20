@@ -1,15 +1,15 @@
-const { createTransaction, PLAN_PRICES } = require('../services/payphone.service');
-const { savePendingPayment }             = require('../services/supabase.service');
-const { v4: uuidv4 }                     = require('uuid');
+const { prepareTransaction, PLAN_PRICES } = require('../services/payphone.service');
+const { savePendingPayment }              = require('../services/supabase.service');
+const { v4: uuidv4 }                      = require('uuid');
 
 /**
  * POST /api/payment/create
- * Acepta campos del frontend (fullName, phone, birthDate)
- * y del backend (nombre, celular, fechaNacimiento)
+ * Prepara la transacción en PayPhone y guarda en Supabase.
+ * Devuelve transactionId y clientTransactionId al frontend
+ * para que renderice la cajita de PayPhone directamente.
  */
 async function createPayment(req, res, next) {
   try {
-    // Normalizar campos — aceptar ambos formatos
     const nombre          = req.body.nombre      || req.body.fullName;
     const email           = req.body.email;
     const celular         = req.body.celular      || req.body.phone;
@@ -26,30 +26,21 @@ async function createPayment(req, res, next) {
 
     const clientTransactionId = uuidv4();
 
-    // 1. Crear transacción en PayPhone
-    const { payPhoneTransactionId, cajitaUrl } = await createTransaction({
-      nombre,
-      email,
-      celular,
-      plan,
-      clientTransactionId,
+    // 1. Preparar transacción en PayPhone
+    const { transactionId } = await prepareTransaction({
+      nombre, email, celular, plan, clientTransactionId,
     });
 
     // 2. Guardar en Supabase
     await savePendingPayment({
       preferenceId: clientTransactionId,
-      nombre,
-      email,
-      celular,
-      fechaNacimiento,
-      plan,
-      valor,
+      nombre, email, celular, fechaNacimiento, plan, valor,
     });
 
+    // 3. Devolver IDs al frontend para renderizar la cajita
     return res.json({
+      transactionId,
       clientTransactionId,
-      payPhoneTransactionId,
-      cajitaUrl,
     });
 
   } catch (error) {
