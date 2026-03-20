@@ -44,8 +44,9 @@ async function createPayment(req, res, next) {
     });
 
   } catch (error) {
-    next(error);
-  }
+  console.error('❌ Error detallado:', error.message, error.stack);
+  next(error);
+}
 }
 
 module.exports = { createPayment };
