@@ -6,11 +6,13 @@ const { confirmPayment } = require('../controllers/webhook.controller');
 const validate = require('../middlewares/validate');
 
 // POST /api/payment/create — Inicia el pago
+// Acepta tanto los nombres del frontend (fullName, phone, birthDate)
+// como los del backend (nombre, celular, fechaNacimiento)
 router.post('/create', [
-  body('nombre').trim().notEmpty().withMessage('Nombre es requerido'),
+  body(['nombre', 'fullName']).optional().trim(),
   body('email').isEmail().withMessage('Email inválido'),
-  body('celular').trim().notEmpty().withMessage('Celular es requerido'),
-  body('fechaNacimiento').notEmpty().withMessage('Fecha de nacimiento requerida'),
+  body(['celular', 'phone']).optional().trim(),
+  body(['fechaNacimiento', 'birthDate']).optional(),
   body('plan')
     .notEmpty()
     .isIn(['mensual','trimestral','semestral','anual'])
