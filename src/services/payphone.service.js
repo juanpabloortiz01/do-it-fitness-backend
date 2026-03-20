@@ -1,25 +1,26 @@
 /**
  * PayPhone - Cajita de Pagos
- * Documentación: https://docs.payphone.app/cajita-de-pagos-payphone
+ * La cajita se renderiza en el FRONTEND con el SDK de PayPhone.
+ * El backend solo prepara la transacción y devuelve el transactionId.
  */
 
 const PAYPHONE_TOKEN    = process.env.PAYPHONE_TOKEN;
 const PAYPHONE_STORE_ID = process.env.PAYPHONE_STORE_ID;
 const BASE_URL          = 'https://pay.payphonetodoesposible.com/api';
 
-// Precios en CENTAVOS (PayPhone trabaja con valores * 100)
+// Precios en CENTAVOS
 const PLAN_PRICES = {
-  mensual:    3500,  // $35.00
-  trimestral: 9000,  // $90.00
-  semestral:  16000, // $160.00
-  anual:      29000, // $290.00
+  mensual:    3500,
+  trimestral: 9000,
+  semestral:  16000,
+  anual:      29000,
 };
 
 /**
- * Crea una transacción en PayPhone (Cajita de Pagos).
- * Endpoint: POST /api/button/Prepare
+ * Prepara la transacción en PayPhone y devuelve el transactionId.
+ * El frontend usa este ID para renderizar la cajita de pagos.
  */
-async function createTransaction({ nombre, email, celular, plan, clientTransactionId }) {
+async function prepareTransaction({ nombre, email, celular, plan, clientTransactionId }) {
   const monto = PLAN_PRICES[plan.toLowerCase()];
   if (!monto) throw new Error(`Plan inválido: ${plan}`);
 
@@ -42,9 +43,9 @@ async function createTransaction({ nombre, email, celular, plan, clientTransacti
     firstName:           nombre,
   };
 
-  console.log('📤 PayPhone request:', JSON.stringify(body, null, 2));
-  console.log('🔑 Token (primeros 20 chars):', PAYPHONE_TOKEN?.substring(0, 20));
-  console.log('🏪 Store ID:', PAYPHONE_STORE_ID);
+  console.log('📤 PayPhone prepare request body:', JSON.stringify(body));
+  console.log('🔑 Token primeros 30 chars:', PAYPHONE_TOKEN?.substring(0, 30));
+  console.log('🏪 StoreID:', PAYPHONE_STORE_ID);
 
   const res = await fetch(`${BASE_URL}/button/Prepare`, {
     method:  'POST',
@@ -55,25 +56,23 @@ async function createTransaction({ nombre, email, celular, plan, clientTransacti
     body: JSON.stringify(body),
   });
 
-  const responseText = await res.text();
-  console.log('📥 PayPhone response status:', res.status);
-  console.log('📥 PayPhone response body:', responseText);
+  const text = await res.text();
+  console.log('📥 PayPhone status:', res.status);
+  console.log('📥 PayPhone response:', text);
 
   if (!res.ok) {
-    throw new Error(`PayPhone error ${res.status}: ${responseText}`);
+    throw new Error(`PayPhone error ${res.status}: ${text}`);
   }
 
-  const data = JSON.parse(responseText);
-
+  const data = JSON.parse(text);
   return {
-    payPhoneTransactionId: data.transactionId,
-    cajitaUrl: `https://pay.payphonetodoesposible.com/pay?transactionId=${data.transactionId}&clientTransactionId=${clientTransactionId}`,
+    transactionId:       data.transactionId,
+    clientTransactionId,
   };
 }
 
 /**
- * Confirma una transacción luego del pago.
- * Endpoint: POST /api/button/V2/Confirm
+ * Confirma la transacción después del pago.
  */
 async function confirmTransaction({ transactionId, clientTransactionId }) {
   const body = { transactionId, clientTransactionId };
@@ -87,17 +86,13 @@ async function confirmTransaction({ transactionId, clientTransactionId }) {
     body: JSON.stringify(body),
   });
 
-  const responseText = await res.text();
+  const text = await res.text();
   console.log('📥 PayPhone confirm status:', res.status);
-  console.log('📥 PayPhone confirm body:', responseText);
+  console.log('📥 PayPhone confirm response:', text);
 
-  if (!res.ok) {
-    throw new Error(`PayPhone confirm error ${res.status}: ${responseText}`);
-  }
+  if (!res.ok) throw new Error(`PayPhone confirm error ${res.status}: ${text}`);
 
-  const data = JSON.parse(responseText);
-
-  // statusCode 3 = aprobado
+  const data = JSON.parse(text);
   return {
     approved:      data.statusCode === 3,
     statusCode:    data.statusCode,
@@ -106,4 +101,4 @@ async function confirmTransaction({ transactionId, clientTransactionId }) {
   };
 }
 
-module.exports = { createTransaction, confirmTransaction, PLAN_PRICES };
+module.exports = { prepareTransaction, confirmTransaction, PLAN_PRICES };
