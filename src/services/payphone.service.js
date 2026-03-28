@@ -1,5 +1,5 @@
-const PAYPHONE_TOKEN    = process.env.PAYPHONE_TOKEN;
-const PAYPHONE_STORE_ID = process.env.PAYPHONE_STORE_ID;
+const PAYPHONE_TOKEN    = process.env.PAYPHONE_TOKEN?.trim();
+const PAYPHONE_STORE_ID = process.env.PAYPHONE_STORE_ID?.trim();
 const BASE_URL          = 'https://pay.payphonetodoesposible.com/api';
 
 const PLAN_PRICES = {
@@ -10,47 +10,62 @@ const PLAN_PRICES = {
 };
 
 /**
- * Confirma la transacción con PayPhone forzando Content-Length.
+ * Confirma la transacción con PayPhone.
+ * Usa https nativo para evitar problemas de Chunked Transfer con Undici.
  */
 async function confirmTransaction({ transactionId, clientTransactionId }) {
-  const cleanToken = PAYPHONE_TOKEN ? String(PAYPHONE_TOKEN).trim() : '';
-  
   const bodyObj = {
-    id: parseInt(String(transactionId).trim(), 10),
-    clientTxId: String(clientTransactionId).trim(),
+    id:                  parseInt(transactionId, 10),
+    clientTransactionId: clientTransactionId.trim(),
   };
 
   const bodyString = JSON.stringify(bodyObj);
-  
-  // 👉 EL FIX DEFINITIVO: Calculamos el peso exacto en bytes del JSON
-  const contentLength = Buffer.byteLength(bodyString, 'utf8');
 
   console.log('📤 PayPhone confirm body:', bodyString);
-  console.log('📏 Content-Length calculado:', contentLength);
+  console.log('🔑 Token (30 chars):', PAYPHONE_TOKEN?.substring(0, 30));
 
-  const res = await fetch(`${BASE_URL}/button/V2/Confirm`, {
-    method:  'POST',
-    headers: {
-      'Content-Type':   'application/json',
-      'Accept':         'application/json',
-      'User-Agent':     'PostmanRuntime/7.32.3',
-      'Authorization':  `Bearer ${cleanToken}`,
-      'Content-Length': contentLength.toString(), // 👉 Evita que ASP.NET crashee
-      'Connection':     'keep-alive' 
-    },
-    body: bodyString,
+  // Usar https nativo para control total sobre los headers
+  const https = require('https');
+  const url   = new URL(`${BASE_URL}/button/V2/Confirm`);
+
+  const data = await new Promise((resolve, reject) => {
+    const options = {
+      hostname: url.hostname,
+      path:     url.pathname,
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(bodyString, 'utf8'),
+        'Accept':         'application/json',
+        'Authorization':  `Bearer ${PAYPHONE_TOKEN}`,
+        'User-Agent':     'PostmanRuntime/7.32.3',
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let raw = '';
+      res.on('data', chunk => raw += chunk);
+      res.on('end', () => {
+        console.log('📥 PayPhone confirm status:', res.statusCode);
+        console.log('📥 PayPhone confirm response:', raw);
+        if (res.statusCode !== 200) {
+          reject(new Error(`PayPhone confirm error ${res.statusCode}: ${raw}`));
+        } else {
+          try {
+            resolve(JSON.parse(raw));
+          } catch {
+            reject(new Error(`PayPhone JSON parse error: ${raw}`));
+          }
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(bodyString);
+    req.end();
   });
 
-  const text = await res.text();
-  console.log('📥 PayPhone confirm status:', res.status);
-  
-  if (!res.ok) {
-    console.error('❌ PayPhone confirm error response:', text.substring(0, 200) + '...');
-    throw new Error(`PayPhone confirm error ${res.status}`);
-  }
-
-  const data = JSON.parse(text);
-
+  // statusCode 3 = Approved
   return {
     approved:      data.statusCode === 3,
     statusCode:    data.statusCode,
