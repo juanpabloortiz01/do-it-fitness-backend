@@ -1,7 +1,11 @@
 const { confirmTransaction }        = require('../services/payphone.service');
 const { emailExists, insertMember } = require('../services/sheets.service');
-const { sendConfirmationEmail }     = require('../services/email.service');
-const supabase                      = require('../config/supabase');
+const {
+  getPendingByPreferenceId,
+  updatePaymentId,
+  markAsPaid,
+  isAlreadyPaid,
+} = require('../services/supabase.service');
 
 async function confirmPayment(req, res, next) {
   try {
@@ -14,26 +18,17 @@ async function confirmPayment(req, res, next) {
       return res.status(400).json({ error: 'Parámetros incompletos' });
     }
 
-    // 1. Buscar datos en Supabase PRIMERO
-    const { data: pending, error } = await supabase
-      .from('pending_payments')
-      .select('*')
-      .eq('mp_preference_id', clientTransactionId)
-      .eq('status', 'pending')
-      .single();
+    // 1. Buscar datos en PostgreSQL
+    const pending = await getPendingByPreferenceId(clientTransactionId);
 
-    if (error || !pending) {
+    if (!pending) {
       console.warn(`⚠️  Sin pending_payment para: ${clientTransactionId}`);
       return res.status(404).json({ error: 'Registro de pago no encontrado' });
     }
 
-    // 2. Actualizar Supabase con el payment_id SIEMPRE (para trazabilidad)
-    await supabase
-      .from('pending_payments')
-      .update({ mp_payment_id: transactionId })
-      .eq('mp_preference_id', clientTransactionId);
-
-    console.log(`💾 Payment ID guardado en Supabase: ${transactionId}`);
+    // 2. Guardar payment_id siempre para trazabilidad
+    await updatePaymentId(clientTransactionId, transactionId);
+    console.log(`💾 Payment ID guardado: ${transactionId}`);
 
     // 3. Verificar con PayPhone
     let approved = false;
@@ -43,26 +38,16 @@ async function confirmPayment(req, res, next) {
       console.log('📥 PayPhone confirm result:', result);
     } catch (ppError) {
       console.error('❌ PayPhone confirm error:', ppError.message);
-      // En sandbox PayPhone falla — no escribimos en Sheets
-      return res.status(402).json({ 
-        error: 'No se pudo verificar el pago con PayPhone',
-        sandbox: true 
-      });
+      return res.status(402).json({ error: 'No se pudo verificar el pago con PayPhone' });
     }
 
     if (!approved) {
-      console.warn(`⚠️  Pago no aprobado: transactionId=${transactionId}`);
-      return res.status(402).json({ success: false, message: 'Pago no aprobado' });
+      console.warn(`⚠️  Pago no aprobado: ${transactionId}`);
+      return res.status(402).json({ success: false, message: 'Pago no aprobado o cancelado' });
     }
 
     // 4. Verificar idempotencia
-    const { data: alreadyPaid } = await supabase
-      .from('pending_payments')
-      .select('status')
-      .eq('mp_preference_id', clientTransactionId)
-      .eq('status', 'paid')
-      .single();
-
+    const alreadyPaid = await isAlreadyPaid(clientTransactionId);
     if (alreadyPaid) {
       return res.json({ success: true, message: 'Pago ya procesado anteriormente' });
     }
@@ -75,18 +60,8 @@ async function confirmPayment(req, res, next) {
     await insertMember(pending, isNew);
     console.log(`📝 Insertado en Sheets`);
 
-    // 7. Marcar como pagado en Supabase
-    await supabase
-      .from('pending_payments')
-      .update({ status: 'paid' })
-      .eq('mp_preference_id', clientTransactionId);
-
-    // 8. Enviar email
-    try {
-      await sendConfirmationEmail(pending, isNew);
-    } catch (emailError) {
-      console.error('❌ Email error:', emailError.message);
-    }
+    // 7. Marcar como pagado
+    await markAsPaid(clientTransactionId);
 
     console.log(`✅ Membresía registrada: ${pending.email} — ${pending.plan} — ${isNew ? 'NUEVO' : 'RENOVACIÓN'}`);
 
