@@ -16,7 +16,7 @@ const PLAN_PRICES = {
 async function confirmTransaction({ transactionId, clientTransactionId }) {
   const bodyObj = {
     id:                  parseInt(transactionId, 10),
-    clientTransactionId: clientTransactionId.trim(),
+    clientTxId: clientTransactionId.trim(),
   };
 
   const bodyString = JSON.stringify(bodyObj);
