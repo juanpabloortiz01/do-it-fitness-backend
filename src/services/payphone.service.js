@@ -1,8 +1,3 @@
-/**
- * PayPhone - Cajita de Pagos
- * La cajita se renderiza en el FRONTEND con el SDK de PayPhone.
- */
-
 const PAYPHONE_TOKEN    = process.env.PAYPHONE_TOKEN;
 const PAYPHONE_STORE_ID = process.env.PAYPHONE_STORE_ID;
 const BASE_URL          = 'https://pay.payphonetodoesposible.com/api';
@@ -16,13 +11,12 @@ const PLAN_PRICES = {
 
 /**
  * Confirma la transacción con PayPhone.
- * Según la documentación oficial el body usa "id" y "clientTxId"
+ * Body según documentación oficial: { id: number, clientTxId: string }
  */
 async function confirmTransaction({ transactionId, clientTransactionId }) {
-  // PayPhone espera "id" como número entero y "clientTxId"
   const body = {
-    id:          parseInt(transactionId, 10),
-    clientTxId:  clientTransactionId,
+    id:        parseInt(transactionId, 10),
+    clientTxId: clientTransactionId,
   };
 
   console.log('📤 PayPhone confirm body:', JSON.stringify(body));
@@ -46,7 +40,7 @@ async function confirmTransaction({ transactionId, clientTransactionId }) {
 
   const data = JSON.parse(text);
 
-  // statusCode 3 = aprobado
+  // statusCode 3 = Approved según documentación oficial
   return {
     approved:      data.statusCode === 3,
     statusCode:    data.statusCode,
