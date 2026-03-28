@@ -1,74 +1,75 @@
-const supabase = require('../config/supabase');
+const pool = require('../config/db');
 
 /**
- * Guarda un pago pendiente mientras esperamos el webhook de MP.
- * @param {object} data - Datos del formulario + preferenceId de MP
+ * Guarda un pago pendiente en PostgreSQL.
  */
 async function savePendingPayment(data) {
-  const { data: record, error } = await supabase
-    .from('pending_payments')
-    .insert([{
-      mp_preference_id: data.preferenceId,
-      nombre:           data.nombre,
-      email:            data.email,
-      celular:          data.celular,
-      fecha_nacimiento: data.fechaNacimiento,
-      plan:             data.plan,
-      valor:            data.valor,
-      status:           'pending',
-    }])
-    .select()
-    .single();
-
-  if (error) throw new Error(`Supabase insert error: ${error.message}`);
-  return record;
+  const query = `
+    INSERT INTO pending_payments 
+      (mp_preference_id, nombre, email, celular, fecha_nacimiento, plan, valor, cedula, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+    RETURNING *
+  `;
+  const values = [
+    data.preferenceId,
+    data.nombre,
+    data.email,
+    data.celular,
+    data.fechaNacimiento,
+    data.plan,
+    data.valor,
+    data.cedula || '',
+  ];
+  const result = await pool.query(query, values);
+  return result.rows[0];
 }
 
 /**
- * Busca un pago pendiente por el payment_id de MercadoPago.
- * MP manda el payment_id en el webhook (distinto al preference_id).
+ * Busca un pago pendiente por clientTransactionId.
  */
-async function getPendingByPaymentId(mpPaymentId) {
-  const { data, error } = await supabase
-    .from('pending_payments')
-    .select('*')
-    .eq('mp_payment_id', mpPaymentId)
-    .single();
-
-  if (error) return null;
-  return data;
+async function getPendingByPreferenceId(preferenceId) {
+  const result = await pool.query(
+    `SELECT * FROM pending_payments WHERE mp_preference_id = $1 AND status = 'pending' LIMIT 1`,
+    [preferenceId]
+  );
+  return result.rows[0] || null;
 }
 
 /**
- * Vincula el payment_id al registro (MP lo manda en el webhook).
+ * Actualiza el payment_id de un registro.
  */
-async function linkPaymentId(preferenceId, mpPaymentId) {
-  const { error } = await supabase
-    .from('pending_payments')
-    .update({ mp_payment_id: mpPaymentId })
-    .eq('mp_preference_id', preferenceId);
-
-  if (error) throw new Error(`Supabase update error: ${error.message}`);
+async function updatePaymentId(preferenceId, paymentId) {
+  await pool.query(
+    `UPDATE pending_payments SET mp_payment_id = $1 WHERE mp_preference_id = $2`,
+    [paymentId, preferenceId]
+  );
 }
 
 /**
- * Marca el pago como completado.
+ * Marca un pago como completado.
  */
-async function markAsPaid(mpPaymentId) {
-  const { data, error } = await supabase
-    .from('pending_payments')
-    .update({ status: 'paid' })
-    .eq('mp_payment_id', mpPaymentId)
-    .select()
-    .single();
+async function markAsPaid(preferenceId) {
+  await pool.query(
+    `UPDATE pending_payments SET status = 'paid', updated_at = NOW() WHERE mp_preference_id = $1`,
+    [preferenceId]
+  );
+}
 
-  if (error) throw new Error(`Supabase update error: ${error.message}`);
-  return data;
+/**
+ * Verifica si ya fue procesado (idempotencia).
+ */
+async function isAlreadyPaid(preferenceId) {
+  const result = await pool.query(
+    `SELECT id FROM pending_payments WHERE mp_preference_id = $1 AND status = 'paid' LIMIT 1`,
+    [preferenceId]
+  );
+  return result.rows.length > 0;
 }
 
 module.exports = {
   savePendingPayment,
-  getPendingByPaymentId,
-  linkPaymentId,
+  getPendingByPreferenceId,
+  updatePaymentId,
   markAsPaid,
+  isAlreadyPaid,
 };
