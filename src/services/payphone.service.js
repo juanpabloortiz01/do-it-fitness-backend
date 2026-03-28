@@ -10,48 +10,47 @@ const PLAN_PRICES = {
 };
 
 /**
- * Confirma la transacción con PayPhone.
- * Body: { id: number, clientTxId: string }
- * Headers: Authorization, Content-Type, Accept, User-Agent
+ * Confirma la transacción con PayPhone forzando Content-Length.
  */
 async function confirmTransaction({ transactionId, clientTransactionId }) {
-  // 1. LIMPIEZA CRÍTICA: Eliminamos espacios o saltos de línea invisibles.
-  // Esto es lo que suele causar el Error 500 de "Runtime Error" en ASP.NET.
   const cleanToken = PAYPHONE_TOKEN ? String(PAYPHONE_TOKEN).trim() : '';
-  const cleanTransactionId = parseInt(String(transactionId).trim(), 10);
-  const cleanClientTxId = String(clientTransactionId).trim();
-
-  // 2. ARMAMOS EL BODY: Usamos 'clientTxId' como confirmaste que funciona en Postman
-  const body = {
-    id: cleanTransactionId,
-    clientTxId: cleanClientTxId,
+  
+  const bodyObj = {
+    id: parseInt(String(transactionId).trim(), 10),
+    clientTxId: String(clientTransactionId).trim(),
   };
 
-  console.log('📤 PayPhone confirm body:', JSON.stringify(body));
+  const bodyString = JSON.stringify(bodyObj);
+  
+  // 👉 EL FIX DEFINITIVO: Calculamos el peso exacto en bytes del JSON
+  const contentLength = Buffer.byteLength(bodyString, 'utf8');
 
-  // 3. FETCH: Replicamos los headers exactos que garantizan la respuesta en JSON
+  console.log('📤 PayPhone confirm body:', bodyString);
+  console.log('📏 Content-Length calculado:', contentLength);
+
   const res = await fetch(`${BASE_URL}/button/V2/Confirm`, {
     method:  'POST',
     headers: {
-      'Content-Type':  'application/json',
-      'Accept':        'application/json',
-      'User-Agent':    'PostmanRuntime/7.32.3', // Simulamos ser Postman por si hay un WAF bloqueando Node
-      'Authorization': `Bearer ${cleanToken}`,
+      'Content-Type':   'application/json',
+      'Accept':         'application/json',
+      'User-Agent':     'PostmanRuntime/7.32.3',
+      'Authorization':  `Bearer ${cleanToken}`,
+      'Content-Length': contentLength.toString(), // 👉 Evita que ASP.NET crashee
+      'Connection':     'keep-alive' 
     },
-    body: JSON.stringify(body),
+    body: bodyString,
   });
 
   const text = await res.text();
   console.log('📥 PayPhone confirm status:', res.status);
   
   if (!res.ok) {
-    console.error('❌ PayPhone confirm response (error):', text);
+    console.error('❌ PayPhone confirm error response:', text.substring(0, 200) + '...');
     throw new Error(`PayPhone confirm error ${res.status}`);
   }
 
   const data = JSON.parse(text);
 
-  // statusCode 3 = Approved según el video oficial
   return {
     approved:      data.statusCode === 3,
     statusCode:    data.statusCode,
