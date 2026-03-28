@@ -11,12 +11,13 @@ const PLAN_PRICES = {
 
 /**
  * Confirma la transacción con PayPhone.
- * Body según documentación oficial: { id: number, clientTxId: string }
+ * Body: { id: number, clientTransactionId: string }
+ * Headers: Authorization, Content-Type, Accept, User-Agent
  */
 async function confirmTransaction({ transactionId, clientTransactionId }) {
   const body = {
-    id:        parseInt(transactionId, 10),
-    clientTxId: clientTransactionId,
+    id:                  parseInt(transactionId, 10),
+    clientTransactionId: clientTransactionId,
   };
 
   console.log('📤 PayPhone confirm body:', JSON.stringify(body));
@@ -25,6 +26,8 @@ async function confirmTransaction({ transactionId, clientTransactionId }) {
     method:  'POST',
     headers: {
       'Content-Type':  'application/json',
+      'Accept':        'application/json',
+      'User-Agent':    'DoItFitnessBackend/1.0 Node.js',
       'Authorization': `Bearer ${PAYPHONE_TOKEN}`,
     },
     body: JSON.stringify(body),
@@ -40,7 +43,7 @@ async function confirmTransaction({ transactionId, clientTransactionId }) {
 
   const data = JSON.parse(text);
 
-  // statusCode 3 = Approved según documentación oficial
+  // statusCode 3 = Approved
   return {
     approved:      data.statusCode === 3,
     statusCode:    data.statusCode,
