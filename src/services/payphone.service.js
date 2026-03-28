@@ -17,7 +17,7 @@ const PLAN_PRICES = {
 async function confirmTransaction({ transactionId, clientTransactionId }) {
   const body = {
     id:                  parseInt(transactionId, 10),
-    clientTransactionId: clientTransactionId,
+    clientTxId: clientTransactionId,
   };
 
   console.log('📤 PayPhone confirm body:', JSON.stringify(body));
