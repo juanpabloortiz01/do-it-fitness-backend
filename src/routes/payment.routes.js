@@ -10,7 +10,7 @@ const { paymentLimiter } = require('../middlewares/rateLimiter');
 router.post('/create', paymentLimiter, [
   body('plan')
     .notEmpty()
-    .isIn(['mensual','trimestral','semestral','anual'])
+    .isIn(['mensual','trimestral','semestral','anual','promo-estudiantes'])
     .withMessage('Plan inválido'),
   validate,
 ], createPayment);
@@ -19,3 +19,4 @@ router.post('/create', paymentLimiter, [
 router.get('/confirm', confirmPayment);
  
 module.exports = router;
+ 
