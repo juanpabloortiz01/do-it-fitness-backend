@@ -133,11 +133,16 @@ async function insertMember(clientData, isNew) {
     clientData.celular,          // F: Celular
     isNew ? 'X' : '',            // G: Nuevo
     isNew ? '' : 'X',            // H: Renovación
+    clientData.objetivo || '',          // I: Objetivo
+    clientData.nivel_experiencia || '', // J: Nivel de Experiencia
+    clientData.horario || '',           // K: Disponibilidad de Horario
+    clientData.tipo_actividad || '',    // L: Tipo de Actividad
+    clientData.ocupacion || '',         // M: Ocupación
   ];
 
   await sheets.spreadsheets.values.append({
     spreadsheetId:    SPREADSHEET_ID,
-    range:            `${sheetName}!A:H`,
+    range:            `${sheetName}!A:M`,
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
     requestBody: { values: [dateRow, memberRow] },

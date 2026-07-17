@@ -6,8 +6,8 @@ const pool = require('../config/db');
 async function savePendingPayment(data) {
   const query = `
     INSERT INTO pending_payments 
-      (mp_preference_id, nombre, email, celular, fecha_nacimiento, plan, valor, cedula, status, promo_code)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+      (mp_preference_id, nombre, email, celular, fecha_nacimiento, plan, valor, cedula, status, promo_code, objetivo, nivel_experiencia, horario, tipo_actividad, ocupacion)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14)
     RETURNING *
   `;
   const values = [
@@ -20,6 +20,11 @@ async function savePendingPayment(data) {
     data.valor,
     data.cedula || '',
     data.promoCode || null,
+    data.objetivo || null,
+    data.nivel_experiencia || null,
+    data.horario || null,
+    data.tipo_actividad || null,
+    data.ocupacion || null,
   ];
   const result = await pool.query(query, values);
   return result.rows[0];

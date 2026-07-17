@@ -17,6 +17,13 @@ async function createPayment(req, res, next) {
     const cedula              = req.body.cedula || req.body.documentId || '';
     const promoCode           = req.body.promoCode || req.body.promo_code;
 
+    // Campos de encuesta opcionales/promocionales
+    const objetivo         = req.body.objetivo;
+    const nivelExperiencia = req.body.nivelExperiencia || req.body.nivel_experiencia;
+    const horario          = req.body.horario;
+    const tipoActividad    = req.body.tipoActividad    || req.body.tipo_actividad;
+    const ocupacion        = req.body.ocupacion;
+
     if (!nombre || !email || !celular || !fechaNacimiento || !plan || !clientTransactionId) {
       return res.status(422).json({ error: 'Todos los campos son requeridos' });
     }
@@ -53,6 +60,11 @@ async function createPayment(req, res, next) {
       valor,
       cedula,
       promoCode: promoCode ? promoCode.trim().toUpperCase() : null,
+      objetivo,
+      nivel_experiencia: nivelExperiencia,
+      horario,
+      tipo_actividad: tipoActividad,
+      ocupacion,
     });
 
     console.log(`💾 Pago pendiente guardado: ${email} — ${plan} — ${clientTransactionId} ${promoCode ? `— Promo: ${promoCode}` : ''}`);
