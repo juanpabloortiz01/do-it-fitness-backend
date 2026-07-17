@@ -5,6 +5,7 @@ const morgan  = require('morgan');
  
 const paymentRoutes    = require('./routes/payment.routes');
 const membershipRoutes = require('./routes/membership.routes');
+const promoRoutes      = require('./routes/promo.routes');
 const errorHandler     = require('./middlewares/errorHandler');
 const { generalLimiter } = require('./middlewares/rateLimiter');
  
@@ -24,6 +25,7 @@ app.use(generalLimiter);
 // ── Rutas ─────────────────────────────────────────────
 app.use('/api/payment',    paymentRoutes);
 app.use('/api/membership', membershipRoutes);
+app.use('/api/promo',      promoRoutes);
  
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));

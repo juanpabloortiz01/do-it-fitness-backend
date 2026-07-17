@@ -5,6 +5,7 @@ const {
   updatePaymentId,
   markAsPaid,
   isAlreadyPaid,
+  markPromoAsUsed,
 } = require('../services/supabase.service');
 
 async function confirmPayment(req, res, next) {
@@ -59,6 +60,12 @@ async function confirmPayment(req, res, next) {
     // 6. Insertar en Google Sheets
     await insertMember(pending, isNew);
     console.log(`📝 Insertado en Sheets`);
+
+    // 6.5. Si tiene un código promocional asociado, marcarlo como usado
+    if (pending.promo_code) {
+      await markPromoAsUsed(pending.promo_code);
+      console.log(`🎟️ Código promocional ${pending.promo_code} marcado como usado`);
+    }
 
     // 7. Marcar como pagado
     await markAsPaid(clientTransactionId);

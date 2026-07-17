@@ -6,8 +6,8 @@ const pool = require('../config/db');
 async function savePendingPayment(data) {
   const query = `
     INSERT INTO pending_payments 
-      (mp_preference_id, nombre, email, celular, fecha_nacimiento, plan, valor, cedula, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+      (mp_preference_id, nombre, email, celular, fecha_nacimiento, plan, valor, cedula, status, promo_code)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
     RETURNING *
   `;
   const values = [
@@ -19,6 +19,7 @@ async function savePendingPayment(data) {
     data.plan,
     data.valor,
     data.cedula || '',
+    data.promoCode || null,
   ];
   const result = await pool.query(query, values);
   return result.rows[0];
@@ -66,10 +67,33 @@ async function isAlreadyPaid(preferenceId) {
   return result.rows.length > 0;
 }
 
+/**
+ * Busca un código de promoción en la tabla leads_promo.
+ */
+async function getPromoByCode(code) {
+  const result = await pool.query(
+    `SELECT * FROM leads_promo WHERE promo_code = $1 LIMIT 1`,
+    [code]
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Marca un código de promoción como utilizado.
+ */
+async function markPromoAsUsed(code) {
+  await pool.query(
+    `UPDATE leads_promo SET used = true, used_at = NOW() WHERE promo_code = $1`,
+    [code]
+  );
+}
+
 module.exports = {
   savePendingPayment,
   getPendingByPreferenceId,
   updatePaymentId,
   markAsPaid,
   isAlreadyPaid,
+  getPromoByCode,
+  markPromoAsUsed,
 };

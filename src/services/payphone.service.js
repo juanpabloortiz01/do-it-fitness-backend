@@ -8,6 +8,7 @@ const PLAN_PRICES = {
   semestral:  16000,
   anual:      29000,
   'promo-estudiantes': 2320,
+  promo:      3183,
 };
 
 /**

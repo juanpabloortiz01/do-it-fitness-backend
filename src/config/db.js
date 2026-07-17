@@ -13,4 +13,14 @@ pool.on('error', (err) => {
   console.error('❌ PostgreSQL error:', err.message);
 });
 
+// Migración rápida para asegurar que la columna promo_code exista en pending_payments
+pool.query(`
+  ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS promo_code TEXT;
+`).then(() => {
+  console.log('✅ Base de datos verificada/migrada con éxito (columna promo_code)');
+}).catch(err => {
+  console.error('❌ Error de migración en pending_payments:', err.message);
+});
+
 module.exports = pool;
+
