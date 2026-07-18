@@ -15,6 +15,7 @@ pool.on('error', (err) => {
 
 // Migración rápida para asegurar que las columnas necesarias existan en pending_payments
 pool.query(`
+  ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS cedula TEXT;
   ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS promo_code TEXT;
   ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS objetivo TEXT;
   ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS nivel_experiencia TEXT;
@@ -22,7 +23,7 @@ pool.query(`
   ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS tipo_actividad TEXT;
   ALTER TABLE pending_payments ADD COLUMN IF NOT EXISTS ocupacion TEXT;
 `).then(() => {
-  console.log('✅ Base de datos verificada/migrada con éxito (columnas de encuesta añadidas)');
+  console.log('✅ Base de datos verificada/migrada con éxito (columnas de encuesta y cédula añadidas)');
 }).catch(err => {
   console.error('❌ Error de migración en pending_payments:', err.message);
 });
